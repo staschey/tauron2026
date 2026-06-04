@@ -318,13 +318,17 @@
       pointer-events: none;
       z-index: 5;
     }
-    .time-now-line::before {
+    .time-now-line.with-dot::before {
       content: '';
       position: absolute;
       left: -1px; top: -3px;
       width: 8px; height: 8px;
       border-radius: 50%;
       background: #ef4444;
+    }
+
+    .act-block.past {
+      opacity: 0.35;
     }
 
 
@@ -565,6 +569,7 @@ const THURSDAY = [
   { id:"t3-1", name:"TEST ACT B",     start:"13:00", end:"15:00", stageId:"3" },
   { id:"t4-1", name:"TEST ACT C",     start:"16:00", end:"18:00", stageId:"4" },
   { id:"t5-1", name:"TEST ACT D",     start:"18:30", end:"20:30", stageId:"5" },
+  { id:"t6-1", name:"TEST SLOT",      start:"11:00", end:"13:00", stageId:"6" },
 ];
 
 // ── ARTIST BIOS (keyed by act ID) ─────────────────────────────
@@ -757,6 +762,10 @@ function updateTimeLine() {
     el.style.display = y === null ? "none" : "block";
     if (y !== null) el.style.top = y + "px";
   });
+  const now = Date.now();
+  document.querySelectorAll(".act-block[data-end-utc]").forEach(el => {
+    el.classList.toggle("past", parseFloat(el.dataset.endUtc) < now);
+  });
 }
 
 // ── TIMETABLE GRID RENDER ─────────────────────────────────────
@@ -810,8 +819,11 @@ function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
   // Remove old stage columns
   bodyEl.querySelectorAll(".stage-col").forEach(el => el.remove());
 
+  const now = Date.now();
+  const gridStart = GRID_STARTS_UTC[currentDay] || 0;
+
   // Stage columns
-  STAGES.forEach(stage => {
+  STAGES.forEach((stage, stageIdx) => {
     const col = document.createElement("div");
     col.className = "stage-col";
     col.style.cssText = `width:${STAGE_COL_W}px;height:${gH}px;`;
@@ -826,10 +838,10 @@ function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
       if (halfY < gH) lineHtml += `<div class="hour-line" style="top:${halfY}px"></div>`;
     });
 
-    // Current time line (once per column)
+    // Current time line — dot only on first (leftmost) column
     const timeLineY = getTimeLineY(currentDay);
     if (timeLineY !== null) {
-      lineHtml += `<div class="time-now-line" style="top:${timeLineY}px"></div>`;
+      lineHtml += `<div class="time-now-line${stageIdx === 0 ? ' with-dot' : ''}" style="top:${timeLineY}px"></div>`;
     }
 
     // Acts for this stage
@@ -839,8 +851,10 @@ function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
       const endMins   = timeMins(act.end, tStart);
       const top    = minsToY(startMins);
       const height = minsToY(endMins - startMins) - 2;
+      const endUtcMs = gridStart + endMins * 60 * 1000;
+      const isPast = gridStart > 0 && endUtcMs < now;
       const myMark = favorites.get(act.id) || "";
-      const classes = ["act-block", act.headliner ? "headliner" : "", myMark].filter(Boolean).join(" ");
+      const classes = ["act-block", act.headliner ? "headliner" : "", myMark, isPast ? "past" : ""].filter(Boolean).join(" ");
 
       const timeLabel = `${act.start}–${act.end}`;
       const displayName = act.name.replace(/\n/g, "<br>");
@@ -851,6 +865,7 @@ function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
         .join("");
 
       lineHtml += `<div class="${classes}" id="act-${act.id}"
+        data-end-utc="${endUtcMs}"
         style="top:${top + 2}px;height:${height}px"
         onclick="openModal('${act.id}')">
         <div class="act-name">${displayName}</div>
