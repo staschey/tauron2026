@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow">
   <title>Nowa Muzyka 2026</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -25,13 +26,88 @@
       padding: 12px 14px 11px;
     }
 
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
     .festival-label {
       font-size: 10px;
       letter-spacing: 0.16em;
       color: #444;
       text-transform: uppercase;
-      margin-bottom: 10px;
     }
+
+    /* ── USER SWITCHER ──────────────────────────────── */
+    .user-switcher {
+      position: relative;
+    }
+
+    .user-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 5px 10px 5px 8px;
+      color: #bbb;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .user-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #888;
+      flex-shrink: 0;
+    }
+
+    .user-caret {
+      font-size: 9px;
+      color: #555;
+      margin-left: 1px;
+    }
+
+    .user-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 50;
+      min-width: 130px;
+    }
+
+    .user-menu.open { display: block; }
+
+    .user-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #aaa;
+      border-bottom: 1px solid #222;
+    }
+    .user-menu-item:last-child { border-bottom: none; }
+    .user-menu-item:active { background: #222; }
+    .user-menu-item.active-user { color: #F59E0B; }
+    .user-menu-item.active-user .user-avatar { background: rgba(245,158,11,0.2); color: #F59E0B; }
 
     .day-tabs {
       display: flex;
@@ -309,7 +385,17 @@
 <body>
 
 <div id="app-header">
-  <div class="festival-label">Nowa Muzyka · Katowice 2026</div>
+  <div class="header-top">
+    <div class="festival-label">Nowa Muzyka · Katowice 2026</div>
+    <div class="user-switcher" id="userSwitcher">
+      <button class="user-btn" onclick="toggleUserMenu(event)" id="userBtn">
+        <div class="user-avatar" id="userAvatarBtn"></div>
+        <span id="userNameBtn"></span>
+        <span class="user-caret">▾</span>
+      </button>
+      <div class="user-menu" id="userMenu"></div>
+    </div>
+  </div>
   <div class="day-tabs" id="dayTabs"></div>
 </div>
 
@@ -486,6 +572,53 @@ const BIOS = {
 };
 
 
+// ── USERS ─────────────────────────────────────────────────────
+const USERS = [
+  { key: "hania",    name: "Hania"    },
+  { key: "marianna", name: "Marianna" },
+  { key: "stachu",   name: "Stachu"   },
+];
+
+function favsKey(userKey) { return `nm26_favs_${userKey}`; }
+function loadFavs(userKey) { return new Set(JSON.parse(localStorage.getItem(favsKey(userKey)) || "[]")); }
+function saveFavs(userKey, set) { localStorage.setItem(favsKey(userKey), JSON.stringify([...set])); }
+
+let currentUser = localStorage.getItem("nm26_user") || "hania";
+let favorites   = loadFavs(currentUser);
+
+function switchUser(key) {
+  currentUser = key;
+  localStorage.setItem("nm26_user", key);
+  favorites = loadFavs(key);
+  renderUserMenu();
+  renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
+  closeUserMenu();
+}
+
+function renderUserMenu() {
+  const user = USERS.find(u => u.key === currentUser);
+  document.getElementById("userNameBtn").textContent  = user.name;
+  document.getElementById("userAvatarBtn").textContent = user.name[0];
+
+  document.getElementById("userMenu").innerHTML = USERS.map(u => `
+    <div class="user-menu-item ${u.key === currentUser ? "active-user" : ""}" onclick="switchUser('${u.key}')">
+      <div class="user-avatar">${u.name[0]}</div>
+      ${u.name}
+    </div>
+  `).join("");
+}
+
+function toggleUserMenu(e) {
+  e.stopPropagation();
+  document.getElementById("userMenu").classList.toggle("open");
+}
+
+function closeUserMenu() {
+  document.getElementById("userMenu").classList.remove("open");
+}
+
+document.addEventListener("click", closeUserMenu);
+
 // ── STATE ─────────────────────────────────────────────────────
 function getDefaultDay() {
   // Poland is CEST = UTC+2 in June
@@ -497,10 +630,9 @@ function getDefaultDay() {
 
 let currentDay = getDefaultDay();
 let currentActId = null;
-let favorites = new Set(JSON.parse(localStorage.getItem("nm26_favs") || "[]"));
 
 function saveFavorites() {
-  localStorage.setItem("nm26_favs", JSON.stringify([...favorites]));
+  saveFavs(currentUser, favorites);
 }
 
 // ── TIME HELPERS ──────────────────────────────────────────────
@@ -685,6 +817,8 @@ function switchDay(day) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
+renderUserMenu();
+
 const tabsEl = document.getElementById("dayTabs");
 tabsEl.innerHTML = DAYS.map(d =>
   `<button class="day-tab ${d.key === currentDay ? "active" : ""}"
