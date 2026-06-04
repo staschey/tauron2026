@@ -261,9 +261,13 @@
       border-color: #2e2a1a;
     }
 
-    .act-block.favorite {
-      background: rgba(245, 158, 11, 0.13);
-      border-color: rgba(245, 158, 11, 0.55);
+    .act-block.maybe {
+      background: rgba(245, 158, 11, 0.10);
+      border-color: rgba(245, 158, 11, 0.5);
+    }
+    .act-block.mustsee {
+      background: rgba(34, 197, 94, 0.10);
+      border-color: rgba(34, 197, 94, 0.5);
     }
 
     .act-name {
@@ -274,7 +278,8 @@
       word-break: break-word;
     }
     .act-block.headliner .act-name { color: #ddd; }
-    .act-block.favorite .act-name  { color: #F59E0B; }
+    .act-block.maybe   .act-name   { color: #F59E0B; }
+    .act-block.mustsee .act-name   { color: #22C55E; }
 
     .act-time {
       font-size: 9px;
@@ -283,7 +288,27 @@
       font-variant-numeric: tabular-nums;
     }
     .act-block.headliner .act-time { color: #4a4020; }
-    .act-block.favorite  .act-time { color: #8a6010; }
+    .act-block.maybe   .act-time   { color: #7a5010; }
+    .act-block.mustsee .act-time   { color: #156030; }
+
+    .act-markers {
+      display: flex;
+      gap: 2px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .act-marker {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      font-size: 8px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .act-marker.maybe   { background: rgba(245,158,11,0.22); color: #F59E0B; }
+    .act-marker.mustsee { background: rgba(34,197,94,0.22);  color: #22C55E; }
 
 
     /* ── MODAL ─────────────────────────────────────── */
@@ -366,21 +391,30 @@
       margin-bottom: 22px;
     }
 
+    .modal-fav-btns {
+      display: flex;
+      gap: 8px;
+    }
     .modal-fav-btn {
-      width: 100%;
-      padding: 14px;
+      flex: 1;
+      padding: 13px 8px;
       border-radius: 12px;
       border: 1px solid #2a2a2a;
       background: transparent;
-      color: #666;
-      font-size: 14px;
+      color: #555;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
     }
-    .modal-fav-btn.on {
+    .modal-fav-btn.maybe.on {
       background: rgba(245, 158, 11, 0.12);
       border-color: rgba(245, 158, 11, 0.6);
       color: #F59E0B;
+    }
+    .modal-fav-btn.mustsee.on {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.6);
+      color: #22C55E;
     }
   </style>
 </head>
@@ -422,7 +456,10 @@
     </div>
     <div class="modal-tags" id="modalTags"></div>
     <div class="modal-bio" id="modalBio"></div>
-    <button class="modal-fav-btn" id="modalFavBtn" onclick="toggleFav()"></button>
+    <div class="modal-fav-btns">
+      <button class="modal-fav-btn maybe"   id="modalMaybeBtn"  onclick="setMark('maybe')">? Maybe</button>
+      <button class="modal-fav-btn mustsee" id="modalMustBtn"   onclick="setMark('mustsee')">★ Must-see</button>
+    </div>
   </div>
 </div>
 
@@ -593,7 +630,7 @@ const USERS = [
   { key: "stachu",   name: "Stachu"   },
 ];
 
-const allFavs = { hania: new Set(), marianna: new Set(), stachu: new Set() };
+const allFavs = { hania: new Map(), marianna: new Map(), stachu: new Map() };
 
 let currentUser = localStorage.getItem("nm26_user") || "hania";
 let favorites   = allFavs[currentUser];
@@ -644,13 +681,15 @@ let currentDay = getDefaultDay();
 let currentActId = null;
 
 function saveFavorites() {
-  db.ref(`favorites/${currentUser}`).set([...favorites]);
+  db.ref(`favorites/${currentUser}`).set(Object.fromEntries(favorites));
 }
 
 // sync from Firebase in real-time
 db.ref("favorites").on("value", snapshot => {
   const data = snapshot.val() || {};
-  USERS.forEach(u => { allFavs[u.key] = new Set(data[u.key] || []); });
+  USERS.forEach(u => {
+    allFavs[u.key] = new Map(Object.entries(data[u.key] || {}));
+  });
   favorites = allFavs[currentUser];
   renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
 });
@@ -735,17 +774,23 @@ function renderGrid(acts) {
       const endMins   = timeMins(act.end);
       const top    = minsToY(startMins);
       const height = minsToY(endMins - startMins) - 2;
-      const isFav  = favorites.has(act.id);
-      const classes = ["act-block", act.headliner ? "headliner" : "", isFav ? "favorite" : ""].filter(Boolean).join(" ");
+      const myMark = favorites.get(act.id) || "";
+      const classes = ["act-block", act.headliner ? "headliner" : "", myMark].filter(Boolean).join(" ");
 
       const timeLabel = `${act.start}–${act.end}`;
       const displayName = act.name.replace(/\n/g, "<br>");
+
+      const markers = USERS
+        .filter(u => allFavs[u.key].has(act.id))
+        .map(u => `<span class="act-marker ${allFavs[u.key].get(act.id)}">${u.name[0]}</span>`)
+        .join("");
 
       lineHtml += `<div class="${classes}" id="act-${act.id}"
         style="top:${top + 2}px;height:${height}px"
         onclick="openModal('${act.id}')">
         <div class="act-name">${displayName}</div>
         <div class="act-time">${timeLabel}</div>
+        ${markers ? `<div class="act-markers">${markers}</div>` : ""}
       </div>`;
     });
 
@@ -780,7 +825,7 @@ function openModal(id) {
   document.getElementById("modalTags").innerHTML = tags;
   document.getElementById("modalBio").textContent = bio.bio || "";
 
-  updateModalBtn();
+  updateModalBtns();
   document.getElementById("overlay").classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -791,25 +836,18 @@ function closeModal() {
   currentActId = null;
 }
 
-function updateModalBtn() {
-  const btn = document.getElementById("modalFavBtn");
-  const isFav = favorites.has(currentActId);
-  btn.textContent = isFav ? "★  Marked as must-see" : "☆  Mark as must-see";
-  btn.classList.toggle("on", isFav);
+function updateModalBtns() {
+  const mark = favorites.get(currentActId);
+  document.getElementById("modalMaybeBtn").classList.toggle("on", mark === "maybe");
+  document.getElementById("modalMustBtn").classList.toggle("on",  mark === "mustsee");
 }
 
-function toggleFav() {
+function setMark(state) {
   if (!currentActId) return;
-  if (favorites.has(currentActId)) favorites.delete(currentActId);
-  else favorites.add(currentActId);
+  if (favorites.get(currentActId) === state) favorites.delete(currentActId);
+  else favorites.set(currentActId, state);
   saveFavorites();
-  updateModalBtn();
-
-  // update the card in background (both grid and simple list)
-  const cardEl = document.getElementById(`act-${currentActId}`);
-  if (cardEl) {
-    cardEl.classList.toggle("favorite", favorites.has(currentActId));
-  }
+  updateModalBtns();
 }
 
 // overlay backdrop dismiss
