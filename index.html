@@ -563,15 +563,6 @@ const SATURDAY = [
   { id:"s6-8", name:"KIPAH\n+ JAZZ JAM",     start:"04:00", end:"05:00", stageId:"6" },
 ];
 
-const THURSDAY = [
-  { id:"t1-1", name:"TEST ACT A",     start:"10:00", end:"12:00", stageId:"1" },
-  { id:"t2-1", name:"HANIA RANI",     start:"20:00", end:"21:00", stageId:"2", headliner:true },
-  { id:"t3-1", name:"TEST ACT B",     start:"13:00", end:"15:00", stageId:"3" },
-  { id:"t4-1", name:"TEST ACT C",     start:"16:00", end:"18:00", stageId:"4" },
-  { id:"t5-1", name:"TEST ACT D",     start:"18:30", end:"20:30", stageId:"5" },
-  { id:"t6-1", name:"TEST SLOT",      start:"11:00", end:"13:00", stageId:"6" },
-];
-
 // ── ARTIST BIOS (keyed by act ID) ─────────────────────────────
 const BIOS = {
   // FRIDAY — NOSPR
@@ -638,8 +629,6 @@ const BIOS = {
   "s6-6": { origin:"Poland",          genres:["Techno","D&B","Bass"], bio:"Sound hunter. Ghettotech, rave, future bass, dubstep, juke, jungle. Golden rule: nothing better than a good drop. JE2B and DOM DJek collective co-creator; Basstronomy Radio Kampus host." },
   "s6-7": { origin:"Poland",          genres:["Electro","Bass"], bio:"Baile funk, juke, bass, miami bass — and whatever she feels in the moment. With a jazz jam twist." },
   "s6-8": { origin:"Poland",          genres:["Electro","UK Garage","Bass"], bio:"Explores garage, grime, baile funk, juke, kuduro — with a jazz jam twist." },
-  // THURSDAY
-  "t2-1": { origin:"Poland", genres:["Ambient","Experimental","Electronic"], bio:"Pianist, composer, vocalist blending classical, jazz and electronics. Chilling Bambino alter ego explores Prophet synthesizer love via dark electronic and hypnotic rhythms. Recently won European Film Award." },
 };
 
 
@@ -740,11 +729,10 @@ function minsToY(mins) { return Math.round(mins * PX_PER_MIN); }
 //   Fri grid: Jun 5 18:00 CEST → Jun 6 06:00 CEST  (UTC: Jun 5 16:00 → Jun 6 04:00)
 //   Sat grid: Jun 6 18:00 CEST → Jun 7 06:00 CEST  (UTC: Jun 6 16:00 → Jun 7 04:00)
 const GRID_STARTS_UTC = {
-  thu: Date.UTC(2026, 5, 4,  8, 0, 0),  // Jun 4 10:00 CEST
   fri: Date.UTC(2026, 5, 5, 16, 0, 0),  // Jun 5 18:00 CEST
   sat: Date.UTC(2026, 5, 6, 16, 0, 0),  // Jun 6 18:00 CEST
 };
-const GRID_SPANS = { thu: 11 * 60, fri: TIME_SPAN, sat: TIME_SPAN };
+const GRID_SPANS = { fri: TIME_SPAN, sat: TIME_SPAN };
 
 function getTimeLineY(day) {
   const start = GRID_STARTS_UTC[day];
@@ -891,15 +879,14 @@ function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
 }
 
 function renderCurrentDay() {
-  if (currentDay === "thu") renderGrid(THURSDAY, 10, 11 * 60);
-  else if (currentDay === "fri") renderGrid(FRIDAY);
+  if (currentDay === "fri") renderGrid(FRIDAY);
   else renderGrid(SATURDAY);
 }
 
 
 // ── MODAL ─────────────────────────────────────────────────────
 function openModal(id) {
-  const act = [...THURSDAY, ...FRIDAY, ...SATURDAY].find(a => a.id === id);
+  const act = [...FRIDAY, ...SATURDAY].find(a => a.id === id);
   if (!act) return;
   const bio = BIOS[id] || {};
   const stage = STAGES.find(s => s.id === act.stageId);
@@ -953,7 +940,6 @@ document.getElementById("modal").addEventListener("touchend",   e => { if (e.cha
 
 // ── DAY SWITCHING ─────────────────────────────────────────────
 const DAYS = [
-  { key:"thu", label:"Thu 4/6" },
   { key:"fri", label:"Fri 5/6" },
   { key:"sat", label:"Sat 6/6" },
 ];
