@@ -559,6 +559,14 @@ const SATURDAY = [
   { id:"s6-8", name:"KIPAH\n+ JAZZ JAM",     start:"04:00", end:"05:00", stageId:"6" },
 ];
 
+const THURSDAY = [
+  { id:"t1-1", name:"TEST ACT A",     start:"10:00", end:"12:00", stageId:"1" },
+  { id:"t2-1", name:"HANIA RANI",     start:"20:00", end:"21:00", stageId:"2", headliner:true },
+  { id:"t3-1", name:"TEST ACT B",     start:"13:00", end:"15:00", stageId:"3" },
+  { id:"t4-1", name:"TEST ACT C",     start:"16:00", end:"18:00", stageId:"4" },
+  { id:"t5-1", name:"TEST ACT D",     start:"18:30", end:"20:30", stageId:"5" },
+];
+
 // ── ARTIST BIOS (keyed by act ID) ─────────────────────────────
 const BIOS = {
   // FRIDAY — NOSPR
@@ -625,6 +633,8 @@ const BIOS = {
   "s6-6": { origin:"Poland",          genres:["Techno","D&B","Bass"], bio:"Sound hunter. Ghettotech, rave, future bass, dubstep, juke, jungle. Golden rule: nothing better than a good drop. JE2B and DOM DJek collective co-creator; Basstronomy Radio Kampus host." },
   "s6-7": { origin:"Poland",          genres:["Electro","Bass"], bio:"Baile funk, juke, bass, miami bass — and whatever she feels in the moment. With a jazz jam twist." },
   "s6-8": { origin:"Poland",          genres:["Electro","UK Garage","Bass"], bio:"Explores garage, grime, baile funk, juke, kuduro — with a jazz jam twist." },
+  // THURSDAY
+  "t2-1": { origin:"Poland", genres:["Ambient","Experimental","Electronic"], bio:"Pianist, composer, vocalist blending classical, jazz and electronics. Chilling Bambino alter ego explores Prophet synthesizer love via dark electronic and hypnotic rhythms. Recently won European Film Award." },
 };
 
 
@@ -657,7 +667,7 @@ function switchUser(key) {
   localStorage.setItem("nm26_user", key);
   favorites = allFavs[key];
   renderUserMenu();
-  renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
+  renderCurrentDay();
   closeUserMenu();
 }
 
@@ -708,14 +718,14 @@ db.ref("favorites").on("value", snapshot => {
     allFavs[u.key] = new Map(Object.entries(data[u.key] || {}));
   });
   favorites = allFavs[currentUser];
-  renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
+  renderCurrentDay();
 });
 
 // ── TIME HELPERS ──────────────────────────────────────────────
-function timeMins(str) {
+function timeMins(str, tStart = TIME_START) {
   const [h, m] = str.replace(/\+/g, "").split(":").map(Number);
-  const hour = h < TIME_START ? h + 24 : h;
-  return (hour - TIME_START) * 60 + m;
+  const hour = h < tStart ? h + 24 : h;
+  return (hour - tStart) * 60 + m;
 }
 
 function minsToY(mins) { return Math.round(mins * PX_PER_MIN); }
@@ -730,7 +740,9 @@ const GRID_STARTS_UTC = {
 };
 
 function getTimeLineY(day) {
-  const elapsed = (Date.now() - GRID_STARTS_UTC[day]) / 60000; // minutes
+  const start = GRID_STARTS_UTC[day];
+  if (!start) return null;
+  const elapsed = (Date.now() - start) / 60000; // minutes
   if (elapsed < 0 || elapsed > TIME_SPAN) return null;
   return minsToY(elapsed);
 }
@@ -746,7 +758,8 @@ function updateTimeLine() {
 }
 
 // ── TIMETABLE GRID RENDER ─────────────────────────────────────
-function renderGrid(acts) {
+function renderGrid(acts, tStart = TIME_START, tSpan = TIME_SPAN) {
+  const gH = tSpan * PX_PER_MIN;
   const totalW = TIME_COL_W + STAGES.length * STAGE_COL_W;
 
   const scroll = document.getElementById("timetable-scroll");
@@ -768,23 +781,25 @@ function renderGrid(acts) {
 
   // ── GRID BODY ──
   const bodyEl = document.getElementById("grid-body");
-  bodyEl.style.height = GRID_H + "px";
+  bodyEl.style.height = gH + "px";
 
   // Time axis
   const timeAxis = document.getElementById("time-axis");
-  timeAxis.style.cssText = `width:${TIME_COL_W}px;height:${GRID_H}px;position:sticky;left:0;flex-shrink:0;background:#0d0d0d;border-right:1px solid #1c1c1c;z-index:10;`;
+  timeAxis.style.cssText = `width:${TIME_COL_W}px;height:${gH}px;position:sticky;left:0;flex-shrink:0;background:#0d0d0d;border-right:1px solid #1c1c1c;z-index:10;`;
 
-  const hours = [18,19,20,21,22,23,0,1,2,3,4,5,6];
+  const numHours = Math.floor(tSpan / 60);
+  const hours = Array.from({length: numHours + 1}, (_, i) => (tStart + i) % 24);
+
   let timeHtml = "";
   hours.forEach(h => {
-    const normH = h < TIME_START ? h + 24 : h;
-    const mins = (normH - TIME_START) * 60;
+    const normH = h < tStart ? h + 24 : h;
+    const mins = (normH - tStart) * 60;
     const y = minsToY(mins);
     const label = String(h).padStart(2,"0") + ":00";
     timeHtml += `<div class="time-label hour" style="top:${y}px">${label}</div>`;
     // half-hour
     const halfY = minsToY(mins + 30);
-    if (halfY < GRID_H) {
+    if (halfY < gH) {
       timeHtml += `<div class="time-label" style="top:${halfY}px;font-size:9px;color:#333">${String(h).padStart(2,"0")}:30</div>`;
     }
   });
@@ -797,16 +812,16 @@ function renderGrid(acts) {
   STAGES.forEach(stage => {
     const col = document.createElement("div");
     col.className = "stage-col";
-    col.style.cssText = `width:${STAGE_COL_W}px;height:${GRID_H}px;`;
+    col.style.cssText = `width:${STAGE_COL_W}px;height:${gH}px;`;
 
     // Hour lines
     let lineHtml = "";
     hours.forEach(h => {
-      const normH = h < TIME_START ? h + 24 : h;
-      const y = minsToY((normH - TIME_START) * 60);
+      const normH = h < tStart ? h + 24 : h;
+      const y = minsToY((normH - tStart) * 60);
       lineHtml += `<div class="hour-line major" style="top:${y}px"></div>`;
-      const halfY = minsToY((normH - TIME_START) * 60 + 30);
-      if (halfY < GRID_H) lineHtml += `<div class="hour-line" style="top:${halfY}px"></div>`;
+      const halfY = minsToY((normH - tStart) * 60 + 30);
+      if (halfY < gH) lineHtml += `<div class="hour-line" style="top:${halfY}px"></div>`;
     });
 
     // Current time line (once per column)
@@ -818,8 +833,8 @@ function renderGrid(acts) {
     // Acts for this stage
     const stageActs = acts.filter(a => a.stageId === stage.id);
     stageActs.forEach(act => {
-      const startMins = timeMins(act.start);
-      const endMins   = timeMins(act.end);
+      const startMins = timeMins(act.start, tStart);
+      const endMins   = timeMins(act.end, tStart);
       const top    = minsToY(startMins);
       const height = minsToY(endMins - startMins) - 2;
       const myMark = favorites.get(act.id) || "";
@@ -848,7 +863,7 @@ function renderGrid(acts) {
 
   // scroll to current time (or first act if no live session)
   const liveY = getTimeLineY(currentDay);
-  const firstActMins = Math.min(...acts.map(a => timeMins(a.start)));
+  const firstActMins = Math.min(...acts.map(a => timeMins(a.start, tStart)));
   scroll.scrollTop = liveY !== null
     ? Math.max(0, liveY - 80)
     : Math.max(0, minsToY(firstActMins) - 20);
@@ -858,10 +873,16 @@ function renderGrid(acts) {
   timeLineInterval = setInterval(updateTimeLine, 60000);
 }
 
+function renderCurrentDay() {
+  if (currentDay === "thu") renderGrid(THURSDAY, 10, 11 * 60);
+  else if (currentDay === "fri") renderGrid(FRIDAY);
+  else renderGrid(SATURDAY);
+}
+
 
 // ── MODAL ─────────────────────────────────────────────────────
 function openModal(id) {
-  const act = [...FRIDAY, ...SATURDAY].find(a => a.id === id);
+  const act = [...THURSDAY, ...FRIDAY, ...SATURDAY].find(a => a.id === id);
   if (!act) return;
   const bio = BIOS[id] || {};
   const stage = STAGES.find(s => s.id === act.stageId);
@@ -915,6 +936,7 @@ document.getElementById("modal").addEventListener("touchend",   e => { if (e.cha
 
 // ── DAY SWITCHING ─────────────────────────────────────────────
 const DAYS = [
+  { key:"thu", label:"Thu 4/6" },
   { key:"fri", label:"Fri 5/6" },
   { key:"sat", label:"Sat 6/6" },
 ];
@@ -924,7 +946,7 @@ function switchDay(day) {
   document.querySelectorAll(".day-tab").forEach(t => {
     t.classList.toggle("active", t.dataset.day === day);
   });
-  renderGrid(day === "fri" ? FRIDAY : SATURDAY);
+  renderCurrentDay();
 }
 
 // ── INIT ──────────────────────────────────────────────────────
