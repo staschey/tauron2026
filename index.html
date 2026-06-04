@@ -735,15 +735,17 @@ function minsToY(mins) { return Math.round(mins * PX_PER_MIN); }
 //   Fri grid: Jun 5 18:00 CEST → Jun 6 06:00 CEST  (UTC: Jun 5 16:00 → Jun 6 04:00)
 //   Sat grid: Jun 6 18:00 CEST → Jun 7 06:00 CEST  (UTC: Jun 6 16:00 → Jun 7 04:00)
 const GRID_STARTS_UTC = {
-  fri: Date.UTC(2026, 5, 5, 16, 0, 0),
-  sat: Date.UTC(2026, 5, 6, 16, 0, 0),
+  thu: Date.UTC(2026, 5, 4,  8, 0, 0),  // Jun 4 10:00 CEST
+  fri: Date.UTC(2026, 5, 5, 16, 0, 0),  // Jun 5 18:00 CEST
+  sat: Date.UTC(2026, 5, 6, 16, 0, 0),  // Jun 6 18:00 CEST
 };
+const GRID_SPANS = { thu: 11 * 60, fri: TIME_SPAN, sat: TIME_SPAN };
 
 function getTimeLineY(day) {
   const start = GRID_STARTS_UTC[day];
   if (!start) return null;
   const elapsed = (Date.now() - start) / 60000; // minutes
-  if (elapsed < 0 || elapsed > TIME_SPAN) return null;
+  if (elapsed < 0 || elapsed > GRID_SPANS[day]) return null;
   return minsToY(elapsed);
 }
 
