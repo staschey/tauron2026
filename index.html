@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="robots" content="noindex, nofollow">
   <title>Nowa Muzyka 2026</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -572,6 +574,18 @@ const BIOS = {
 };
 
 
+// ── FIREBASE ──────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyBaFGUB1gjfOMMWLqfDh55L6XqKzouIndY",
+  authDomain: "tauron-36a95.firebaseapp.com",
+  databaseURL: "https://tauron-36a95-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tauron-36a95",
+  storageBucket: "tauron-36a95.firebasestorage.app",
+  messagingSenderId: "368621501863",
+  appId: "1:368621501863:web:d6bff46f4b91b678d24a82"
+});
+const db = firebase.database();
+
 // ── USERS ─────────────────────────────────────────────────────
 const USERS = [
   { key: "hania",    name: "Hania"    },
@@ -579,17 +593,15 @@ const USERS = [
   { key: "stachu",   name: "Stachu"   },
 ];
 
-function favsKey(userKey) { return `nm26_favs_${userKey}`; }
-function loadFavs(userKey) { return new Set(JSON.parse(localStorage.getItem(favsKey(userKey)) || "[]")); }
-function saveFavs(userKey, set) { localStorage.setItem(favsKey(userKey), JSON.stringify([...set])); }
+const allFavs = { hania: new Set(), marianna: new Set(), stachu: new Set() };
 
 let currentUser = localStorage.getItem("nm26_user") || "hania";
-let favorites   = loadFavs(currentUser);
+let favorites   = allFavs[currentUser];
 
 function switchUser(key) {
   currentUser = key;
   localStorage.setItem("nm26_user", key);
-  favorites = loadFavs(key);
+  favorites = allFavs[key];
   renderUserMenu();
   renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
   closeUserMenu();
@@ -632,8 +644,16 @@ let currentDay = getDefaultDay();
 let currentActId = null;
 
 function saveFavorites() {
-  saveFavs(currentUser, favorites);
+  db.ref(`favorites/${currentUser}`).set([...favorites]);
 }
+
+// sync from Firebase in real-time
+db.ref("favorites").on("value", snapshot => {
+  const data = snapshot.val() || {};
+  USERS.forEach(u => { allFavs[u.key] = new Set(data[u.key] || []); });
+  favorites = allFavs[currentUser];
+  renderGrid(currentDay === "fri" ? FRIDAY : SATURDAY);
+});
 
 // ── TIME HELPERS ──────────────────────────────────────────────
 function timeMins(str) {
